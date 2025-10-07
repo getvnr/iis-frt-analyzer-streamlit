@@ -18,14 +18,14 @@ render_option = st.radio("Select rendering method:", ["Use freb.xsl (HTML Report
 xsl_path = "freb.xsl"
 if not os.path.exists(xsl_path):
     st.error("freb.xsl not found in the repository. Please upload it or use the Parse Events Directly option.")
-    xsl_content = None
+    xsl_bytes = None
 else:
     with open(xsl_path, "rb") as f:  # Read as bytes
         xsl_bytes = f.read()
 
 if uploaded_xml is not None:
     try:
-        if render_option == "Use freb.xsl (HTML Report)" and xsl_content:
+        if render_option == "Use freb.xsl (HTML Report)" and xsl_bytes:
             # Use bytes for lxml parsing
             xml_bytes = uploaded_xml.getvalue()  # Raw bytes of XML
             xml_doc = etree.parse(BytesIO(xml_bytes))
