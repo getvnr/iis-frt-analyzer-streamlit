@@ -5,6 +5,35 @@ from io import BytesIO, StringIO
 from lxml import etree
 import os
 
+# Inject custom CSS for full-screen layout
+st.markdown(
+    """
+    <style>
+    /* Remove Streamlit's default padding and margins */
+    .main .block-container {
+        padding: 0;
+        max-width: 100%;
+    }
+    /* Ensure the main content area uses full height */
+    .main {
+        height: 100vh;
+        overflow: auto;
+    }
+    /* Make the HTML component full-screen */
+    iframe[title="st.components.v1.html"] {
+        width: 100%;
+        height: 100vh;
+        border: none;
+    }
+    /* Adjust sidebar (optional, if you want to keep it visible) */
+    .css-1d391kg {
+        padding: 0;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 st.title("IIS Failed Request Tracing Analyzer with freb.xsl")
 st.write("Upload your FRT XML file (e.g., fr000031.xml) to view the report using freb.xsl or parse events directly.")
 
@@ -33,9 +62,9 @@ if uploaded_xml is not None:
             transform = etree.XSLT(xsl_doc)
             html_result = transform(xml_doc)
             
-            # Render HTML in Streamlit
+            # Render HTML in Streamlit, full-screen
             st.subheader("Transformed HTML Report (via freb.xsl)")
-            st.components.v1.html(str(html_result), height=600, scrolling=True)
+            st.components.v1.html(str(html_result), height=800, scrolling=True)  # Height set high for full-screen effect
             
             # Debug: Check for events using lxml
             event_nodes = xml_doc.xpath("//iis:event", namespaces={"iis": "http://schemas.microsoft.com/win/2004/08/events/trace"})
