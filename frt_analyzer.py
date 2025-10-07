@@ -25,9 +25,13 @@ st.markdown(
         height: 100vh;
         border: none;
     }
-    /* Adjust sidebar (optional, if you want to keep it visible) */
+    /* Adjust sidebar */
     .css-1d391kg {
         padding: 0;
+    }
+    /* Hide Streamlit header and footer for true full-screen */
+    header, footer {
+        visibility: hidden;
     }
     </style>
     """,
@@ -35,7 +39,7 @@ st.markdown(
 )
 
 st.title("IIS Failed Request Tracing Analyzer with freb.xsl")
-st.write("Upload your FRT XML file (e.g., fr000031.xml) to view the report using freb.xsl or parse events directly.")
+st.write("Upload your FRT XML file (e.g., fr000031.xml) to view the full-screen Request Diagnostics report.")
 
 # File uploader for XML
 uploaded_xml = st.file_uploader("Choose an FRT XML file", type="xml")
@@ -43,28 +47,42 @@ uploaded_xml = st.file_uploader("Choose an FRT XML file", type="xml")
 # Option to choose rendering method
 render_option = st.radio("Select rendering method:", ["Use freb.xsl (HTML Report)", "Parse Events Directly (Table View)"])
 
+# Toggle for maximizing HTML report
+maximize_report = st.checkbox("Maximize HTML Report (Hide UI)", value=False)
+
 # Load freb.xsl from the repo
 xsl_path = "freb.xsl"
 if not os.path.exists(xsl_path):
     st.error("freb.xsl not found in the repository. Please upload it or use the Parse Events Directly option.")
     xsl_bytes = None
 else:
-    with open(xsl_path, "rb") as f:  # Read as bytes
+    with open(xsl_path, "rb") as f:
         xsl_bytes = f.read()
 
 if uploaded_xml is not None:
     try:
         if render_option == "Use freb.xsl (HTML Report)" and xsl_bytes:
             # Use bytes for lxml parsing
-            xml_bytes = uploaded_xml.getvalue()  # Raw bytes of XML
+            xml_bytes = uploaded_xml.getvalue()
             xml_doc = etree.parse(BytesIO(xml_bytes))
-            xsl_doc = etree.parse(BytesIO(xsl_bytes))  # Use bytes for XSL
+            xsl_doc = etree.parse(BytesIO(xsl_bytes))
             transform = etree.XSLT(xsl_doc)
             html_result = transform(xml_doc)
             
             # Render HTML in Streamlit, full-screen
-            st.subheader("Transformed HTML Report (via freb.xsl)")
-            st.components.v1.html(str(html_result), height=800, scrolling=True)  # Height set high for full-screen effect
+            st.subheader("Request Diagnostics (via freb.xsl)")
+            if maximize_report:
+                # Hide other UI elements for true full-screen
+                st.markdown(
+                    """
+                    <style>
+                    .stApp { margin: 0; padding: 0; }
+                    .stFileUploader, .stRadio, .stCheckbox { display: none; }
+                    </style>
+                    """,
+                    unsafe_allow_html=True
+                )
+            st.components.v1.html(str(html_result), height=1000, scrolling=True)  # Increased height for full-screen
             
             # Debug: Check for events using lxml
             event_nodes = xml_doc.xpath("//iis:event", namespaces={"iis": "http://schemas.microsoft.com/win/2004/08/events/trace"})
@@ -76,7 +94,7 @@ if uploaded_xml is not None:
                     st.write(f"- {child.tag}")
         
         elif render_option == "Parse Events Directly (Table View)":
-            # Parse XML with ElementTree (for fallback)
+            # Parse XML with ElementTree
             xml_content = StringIO(uploaded_xml.getvalue().decode("utf-8"))
             tree = ET.parse(xml_content)
             root = tree.getroot()
@@ -90,6 +108,12 @@ if uploaded_xml is not None:
                 status_code = root.get("statusCode", "N/A")
                 sub_status_code = root.get("subStatusCode", "N/A")
                 time_taken = root.get("timeTaken", "N/A")
+                site = root.get("siteId", "N/A")
+                process = root.get("processId", "N/A")
+                app_pool = root.get("appPoolId", "N/A")
+                authentication = root.get("authentication", "N/A")
+                user = root.get("userName", "N/A")
+                activity_id = root.get("activityId", "N/A")
                 
                 # Extract verb
                 verb = "N/A"
@@ -135,13 +159,20 @@ if uploaded_xml is not None:
                 elif status_code == "500":
                     root_cause = "Server Error (Review modules/logs)"
                 
-                # Display summary
+                # Display summary with provided details
                 st.subheader("Request Summary")
                 col1, col2, col3, col4 = st.columns(4)
                 col1.metric("URL", url)
                 col2.metric("Status Code", f"{status_code}.{sub_status_code}")
                 col3.metric("Time Taken", f"{time_taken} ms")
                 col4.metric("Root Cause", root_cause)
+                col1.metric("Site", site)
+                col2.metric("Process", process)
+                col3.metric("App Pool", app_pool)
+                col4.metric("Authentication", authentication)
+                col1.metric("User", user)
+                col2.metric("Activity ID", activity_id)
+                col3.metric("Verb", verb)
                 
                 # Display timeline
                 st.subheader("Event Timeline")
