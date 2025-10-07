@@ -8,44 +8,29 @@ import os
 # Inject custom CSS for full-screen layout
 st.markdown(
     """
-    <style>
-    /* Remove Streamlit's default padding and margins */
-    .main .block-container {
-        padding: 0;
-        max-width: 100%;
-    }
-    /* Ensure the main content area uses full height */
-    .main {
-        height: 100vh;
-        overflow: hidden;
-    }
-    /* Make the HTML component full-screen */
-    iframe[title="st.components.v1.html"] {
-        width: 100%;
-        height: 100vh;
-        border: none;
-    }
-    /* Adjust sidebar */
-    .css-1d391kg {
-        padding: 0;
-    }
-    /* Hide Streamlit header and footer */
-    header, footer {
-        visibility: hidden;
-    }
-    /* Full-screen mode styles */
-    .fullscreen-mode .stApp {
-        margin: 0;
-        padding: 0;
-    }
-    .fullscreen-mode .stFileUploader,
-    .fullscreen-mode .stRadio,
-    .fullscreen-mode .stCheckbox,
-    .fullscreen-mode .stMarkdown,
-    .fullscreen-mode .stButton {
-        display: none;
-    }
-    </style>
+<style>
+/* Existing styles remain */
+html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+}
+.main .block-container {
+    padding: 0;
+    max-width: 100%;
+    height: 100vh;
+}
+iframe[title="st.components.v1.html"] {
+    width: 100%;
+    height: 100vh;
+    border: none;
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+/* Existing styles for fullscreen-mode and others */
+</style>
     """,
     unsafe_allow_html=True
 )
