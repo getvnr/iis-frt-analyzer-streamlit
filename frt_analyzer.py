@@ -63,17 +63,21 @@ st.markdown(
 # Initialize session state
 if "fullscreen" not in st.session_state:
     st.session_state.fullscreen = False
+if "uploaded_xml" not in st.session_state:
+    st.session_state.uploaded_xml = None
+if "render_option" not in st.session_state:
+    st.session_state.render_option = "Use freb.xsl (HTML Report)"
 
 # Main UI
 if not st.session_state.fullscreen:
     st.title("IIS Failed Request Tracing Analyzer")
     st.write("Upload your FRT XML file (e.g., fr000031.xml) to analyze request diagnostics.")
 
-    uploaded_xml = st.file_uploader("Choose an FRT XML file", type="xml")
-    render_option = st.radio("Select rendering method:", ["Use freb.xsl (HTML Report)", "Parse Events Directly (Table View)"])
+    st.session_state.uploaded_xml = st.file_uploader("Choose an FRT XML file", type="xml")
+    st.session_state.render_option = st.radio("Select rendering method:", ["Use freb.xsl (HTML Report)", "Parse Events Directly (Table View)"])
 
     if st.button("Enter Full-Screen Mode (HTML Report Only)"):
-        if uploaded_xml and render_option == "Use freb.xsl (HTML Report)":
+        if st.session_state.uploaded_xml and st.session_state.render_option == "Use freb.xsl (HTML Report)":
             st.session_state.fullscreen = True
             st.rerun()
         else:
@@ -91,9 +95,9 @@ else:
 # Full-screen mode
 if st.session_state.fullscreen:
     st.markdown('<div class="fullscreen-mode">', unsafe_allow_html=True)
-    if uploaded_xml and xsl_bytes and render_option == "Use freb.xsl (HTML Report)":
+    if st.session_state.uploaded_xml and xsl_bytes and st.session_state.render_option == "Use freb.xsl (HTML Report)":
         try:
-            xml_bytes = uploaded_xml.getvalue()
+            xml_bytes = st.session_state.uploaded_xml.getvalue()
             xml_doc = etree.parse(BytesIO(xml_bytes))
             xsl_doc = etree.parse(BytesIO(xsl_bytes))
             transform = etree.XSLT(xsl_doc)
@@ -116,10 +120,10 @@ if st.session_state.fullscreen:
     st.markdown('</div>', unsafe_allow_html=True)
 
 # Non-full-screen processing
-if uploaded_xml and not st.session_state.fullscreen:
+if st.session_state.uploaded_xml and not st.session_state.fullscreen:
     try:
-        if render_option == "Parse Events Directly (Table View)":
-            xml_content = StringIO(uploaded_xml.getvalue().decode("utf-8"))
+        if st.session_state.render_option == "Parse Events Directly (Table View)":
+            xml_content = StringIO(st.session_state.uploaded_xml.getvalue().decode("utf-8"))
             tree = ET.parse(xml_content)
             root = tree.getroot()
 
