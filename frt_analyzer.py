@@ -1,7 +1,7 @@
 import streamlit as st
 import xml.etree.ElementTree as ET
 import pandas as pd
-from io import StringIO
+from io import BytesIO, StringIO
 from lxml import etree
 import os
 
@@ -25,12 +25,10 @@ else:
 
 if uploaded_xml is not None:
     try:
-        # Read XML content
-        xml_content = StringIO(uploaded_xml.getvalue().decode("utf-8"))
-        
         if render_option == "Use freb.xsl (HTML Report)" and xsl_content:
-            # Apply XSLT transformation
-            xml_doc = etree.parse(xml_content)
+            # Use bytes for lxml to handle encoding declaration
+            xml_bytes = uploaded_xml.getvalue()  # Raw bytes
+            xml_doc = etree.parse(BytesIO(xml_bytes))
             xsl_doc = etree.parse(StringIO(xsl_content))
             transform = etree.XSLT(xsl_doc)
             html_result = transform(xml_doc)
@@ -49,7 +47,8 @@ if uploaded_xml is not None:
                     st.write(f"- {child.tag}")
         
         elif render_option == "Parse Events Directly (Table View)":
-            # Existing event-parsing logic (fallback for debugging)
+            # Parse XML with ElementTree (for fallback)
+            xml_content = StringIO(uploaded_xml.getvalue().decode("utf-8"))
             tree = ET.parse(xml_content)
             root = tree.getroot()
             
