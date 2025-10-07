@@ -20,16 +20,16 @@ if not os.path.exists(xsl_path):
     st.error("freb.xsl not found in the repository. Please upload it or use the Parse Events Directly option.")
     xsl_content = None
 else:
-    with open(xsl_path, "r", encoding="utf-8") as f:
-        xsl_content = f.read()
+    with open(xsl_path, "rb") as f:  # Read as bytes
+        xsl_bytes = f.read()
 
 if uploaded_xml is not None:
     try:
         if render_option == "Use freb.xsl (HTML Report)" and xsl_content:
-            # Use bytes for lxml to handle encoding declaration
-            xml_bytes = uploaded_xml.getvalue()  # Raw bytes
+            # Use bytes for lxml parsing
+            xml_bytes = uploaded_xml.getvalue()  # Raw bytes of XML
             xml_doc = etree.parse(BytesIO(xml_bytes))
-            xsl_doc = etree.parse(StringIO(xsl_content))
+            xsl_doc = etree.parse(BytesIO(xsl_bytes))  # Use bytes for XSL
             transform = etree.XSLT(xsl_doc)
             html_result = transform(xml_doc)
             
@@ -37,7 +37,7 @@ if uploaded_xml is not None:
             st.subheader("Transformed HTML Report (via freb.xsl)")
             st.components.v1.html(str(html_result), height=600, scrolling=True)
             
-            # Debug: Check for events
+            # Debug: Check for events using lxml
             event_nodes = xml_doc.xpath("//iis:event", namespaces={"iis": "http://schemas.microsoft.com/win/2004/08/events/trace"})
             st.write(f"Debug: Found {len(event_nodes)} event nodes in XML")
             if len(event_nodes) == 0:
@@ -136,7 +136,9 @@ if uploaded_xml is not None:
     
     except etree.ParseError as e:
         st.error(f"XML/XSL parsing error: {e}")
+        st.write("Debug: Check if freb.xsl or XML file has a valid XML declaration and structure.")
     except Exception as e:
         st.error(f"Error processing file: {e}")
+        st.write("Debug: An unexpected error occurred. Please share the XML structure or error details.")
 else:
     st.info("👆 Upload an FRT XML file to get started!")
