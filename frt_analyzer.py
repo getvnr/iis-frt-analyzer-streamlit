@@ -17,7 +17,7 @@ st.markdown(
     /* Ensure the main content area uses full height */
     .main {
         height: 100vh;
-        overflow: auto;
+        overflow: hidden;
     }
     /* Make the HTML component full-screen */
     iframe[title="st.components.v1.html"] {
@@ -29,26 +29,46 @@ st.markdown(
     .css-1d391kg {
         padding: 0;
     }
-    /* Hide Streamlit header and footer for true full-screen */
+    /* Hide Streamlit header and footer */
     header, footer {
         visibility: hidden;
+    }
+    /* Full-screen mode styles */
+    .fullscreen-mode .stApp {
+        margin: 0;
+        padding: 0;
+    }
+    .fullscreen-mode .stFileUploader,
+    .fullscreen-mode .stRadio,
+    .fullscreen-mode .stCheckbox,
+    .fullscreen-mode .stMarkdown,
+    .fullscreen-mode .stButton {
+        display: none;
     }
     </style>
     """,
     unsafe_allow_html=True
 )
 
-st.title("IIS Failed Request Tracing Analyzer with freb.xsl")
-st.write("Upload your FRT XML file (e.g., fr000031.xml) to view the full-screen Request Diagnostics report.")
+# Initialize session state for full-screen mode
+if "fullscreen" not in st.session_state:
+    st.session_state.fullscreen = False
 
-# File uploader for XML
-uploaded_xml = st.file_uploader("Choose an FRT XML file", type="xml")
-
-# Option to choose rendering method
-render_option = st.radio("Select rendering method:", ["Use freb.xsl (HTML Report)", "Parse Events Directly (Table View)"])
-
-# Toggle for maximizing HTML report
-maximize_report = st.checkbox("Maximize HTML Report (Hide UI)", value=False)
+# Toggle full-screen mode
+if not st.session_state.fullscreen:
+    st.title("IIS Failed Request Tracing Analyzer with freb.xsl")
+    st.write("Upload your FRT XML file (e.g., fr000031.xml) to view the full-screen Request Diagnostics report.")
+    
+    # File uploader for XML
+    uploaded_xml = st.file_uploader("Choose an FRT XML file", type="xml")
+    
+    # Option to choose rendering method
+    render_option = st.radio("Select rendering method:", ["Use freb.xsl (HTML Report)", "Parse Events Directly (Table View)"])
+    
+    # Button to enter full-screen mode
+    if st.button("Enter Full-Screen Mode (HTML Report Only)"):
+        st.session_state.fullscreen = True
+        st.rerun()
 
 # Load freb.xsl from the repo
 xsl_path = "freb.xsl"
@@ -58,6 +78,10 @@ if not os.path.exists(xsl_path):
 else:
     with open(xsl_path, "rb") as f:
         xsl_bytes = f.read()
+
+# Apply fullscreen class if enabled
+if st.session_state.fullscreen:
+    st.markdown('<div class="fullscreen-mode">', unsafe_allow_html=True)
 
 if uploaded_xml is not None:
     try:
@@ -69,29 +93,19 @@ if uploaded_xml is not None:
             transform = etree.XSLT(xsl_doc)
             html_result = transform(xml_doc)
             
-            # Render HTML in Streamlit, full-screen
+            # Render HTML in Streamlit
             st.subheader("Request Diagnostics (via freb.xsl)")
-            if maximize_report:
-                # Hide other UI elements for true full-screen
-                st.markdown(
-                    """
-                    <style>
-                    .stApp { margin: 0; padding: 0; }
-                    .stFileUploader, .stRadio, .stCheckbox { display: none; }
-                    </style>
-                    """,
-                    unsafe_allow_html=True
-                )
-            st.components.v1.html(str(html_result), height=1000, scrolling=True)  # Increased height for full-screen
+            st.components.v1.html(str(html_result), height=1000, scrolling=True)
             
             # Debug: Check for events using lxml
-            event_nodes = xml_doc.xpath("//iis:event", namespaces={"iis": "http://schemas.microsoft.com/win/2004/08/events/trace"})
-            st.write(f"Debug: Found {len(event_nodes)} event nodes in XML")
-            if len(event_nodes) == 0:
-                st.warning("No <event> tags found. Check XML structure or IIS tracing settings.")
-                st.write("Debug: First few tags in XML:")
-                for child in xml_doc.getroot()[:5]:
-                    st.write(f"- {child.tag}")
+            if not st.session_state.fullscreen:
+                event_nodes = xml_doc.xpath("//iis:event", namespaces={"iis": "http://schemas.microsoft.com/win/2004/08/events/trace"})
+                st.write(f"Debug: Found {len(event_nodes)} event nodes in XML")
+                if len(event_nodes) == 0:
+                    st.warning("No <event> tags found. Check XML structure or IIS tracing settings.")
+                    st.write("Debug: First few tags in XML:")
+                    for child in xml_doc.getroot()[:5]:
+                        st.write(f"- {child.tag}")
         
         elif render_option == "Parse Events Directly (Table View)":
             # Parse XML with ElementTree
@@ -114,8 +128,6 @@ if uploaded_xml is not None:
                 authentication = root.get("authentication", "N/A")
                 user = root.get("userName", "N/A")
                 activity_id = root.get("activityId", "N/A")
-                
-                # Extract verb
                 verb = "N/A"
                 for data in root.iterfind(".//{http://schemas.microsoft.com/win/2004/08/events/trace}data") or root.iter("data"):
                     if data.find("name") is not None and data.find("name").text == "VERB":
@@ -126,7 +138,9 @@ if uploaded_xml is not None:
                 events = []
                 ns = {"iis": "http://schemas.microsoft.com/win/2004/08/events/trace"}
                 event_nodes = list(root.iterfind(".//{http://schemas.microsoft.com/win/2004/08/events/trace}event")) or list(root.iter("event"))
-                st.write(f"Debug: Found {len(event_nodes)} event nodes")
+                
+                if not st.session_state.fullscreen:
+                    st.write(f"Debug: Found {len(event_nodes)} event nodes")
                 
                 for i, event in enumerate(event_nodes):
                     event_name = event.find("name", ns) or event.find("name")
@@ -159,40 +173,41 @@ if uploaded_xml is not None:
                 elif status_code == "500":
                     root_cause = "Server Error (Review modules/logs)"
                 
-                # Display summary with provided details
-                st.subheader("Request Summary")
-                col1, col2, col3, col4 = st.columns(4)
-                col1.metric("URL", url)
-                col2.metric("Status Code", f"{status_code}.{sub_status_code}")
-                col3.metric("Time Taken", f"{time_taken} ms")
-                col4.metric("Root Cause", root_cause)
-                col1.metric("Site", site)
-                col2.metric("Process", process)
-                col3.metric("App Pool", app_pool)
-                col4.metric("Authentication", authentication)
-                col1.metric("User", user)
-                col2.metric("Activity ID", activity_id)
-                col3.metric("Verb", verb)
+                # Display summary
+                if not st.session_state.fullscreen:
+                    st.subheader("Request Summary")
+                    col1, col2, col3, col4 = st.columns(4)
+                    col1.metric("URL", url)
+                    col2.metric("Status Code", f"{status_code}.{sub_status_code}")
+                    col3.metric("Time Taken", f"{time_taken} ms")
+                    col4.metric("Root Cause", root_cause)
+                    col1.metric("Site", site)
+                    col2.metric("Process", process)
+                    col3.metric("App Pool", app_pool)
+                    col4.metric("Authentication", authentication)
+                    col1.metric("User", user)
+                    col2.metric("Activity ID", activity_id)
+                    col3.metric("Verb", verb)
                 
-                # Display timeline
-                st.subheader("Event Timeline")
-                if not df.empty:
-                    st.dataframe(df, use_container_width=True)
-                else:
-                    st.warning("No events found in the XML file. Check if <event> tags exist or use freb.xsl option.")
-                    st.write("Debug: First few tags in XML:")
-                    for child in root[:5]:
-                        st.write(f"- {child.tag}")
+                    # Display timeline
+                    st.subheader("Event Timeline")
+                    if not df.empty:
+                        st.dataframe(df, use_container_width=True)
+                    else:
+                        st.warning("No events found in the XML file. Check if <event> tags exist or use freb.xsl option.")
+                        st.write("Debug: First few tags in XML:")
+                        for child in root[:5]:
+                            st.write(f"- {child.tag}")
                 
-                # Insights
-                st.subheader("Insights")
-                st.write(f"- Total Events: {len(events)}")
-                st.write(f"- Recommendation: For {root_cause}, inspect the error in the timeline (e.g., FILE_CACHE_ACCESS_END with code 0x80070002).")
+                    # Insights
+                    st.subheader("Insights")
+                    st.write(f"- Total Events: {len(events)}")
+                    st.write(f"- Recommendation: For {root_cause}, inspect the error in the timeline (e.g., FILE_CACHE_ACCESS_END with code 0x80070002).")
                 
-                # Download CSV
-                if not df.empty:
-                    csv = df.to_csv(index=False).encode("utf-8")
-                    st.download_button("Download Timeline as CSV", csv, "frt_timeline.csv", "text/csv")
+                    # Download CSV
+                    if not df.empty:
+                        csv = df.to_csv(index=False).encode("utf-8")
+                        st.download_button("Download Timeline as CSV", csv, "frt_timeline.csv", "text/csv")
     
     except etree.ParseError as e:
         st.error(f"XML/XSL parsing error: {e}")
@@ -201,4 +216,13 @@ if uploaded_xml is not None:
         st.error(f"Error processing file: {e}")
         st.write("Debug: An unexpected error occurred. Please share the XML structure or error details.")
 else:
-    st.info("👆 Upload an FRT XML file to get started!")
+    if st.session_state.fullscreen:
+        st.error("Please upload an XML file to view the full-screen report.")
+        if st.button("Exit Full-Screen Mode"):
+            st.session_state.fullscreen = False
+            st.rerun()
+    else:
+        st.info("👆 Upload an FRT XML file to get started!")
+
+if st.session_state.fullscreen:
+    st.markdown('</div>', unsafe_allow_html=True)
